@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>AIM & DODGE TRAINER</title>
+<style>
+  body { margin:0; background:#111; color:white; font-family:Arial; overflow:hidden; }
+  #game { position:relative; width:100vw; height:100vh; }
+  .enemy, .ping { position:absolute; border-radius:50%; cursor:pointer; }
+  .enemy { width:30px; height:30px; background:red; }
+  .ping { width:20px; height:20px; background:yellow; }
+  #ui { position:fixed; top:10px; left:10px; font-size:16px; }
+  #blind { position:fixed; inset:0; background:black; display:none; z-index:10; }
+  #weapon { position:fixed; bottom:-10px; right:20px; width:320px; height:180px;
+            background:linear-gradient(90deg,#333,#111); clip-path: polygon(0 60%,100% 80%,100% 100%,0 100%); z-index:5;}
+  #crosshair { position:fixed; top:50%; left:50%; width:6px; height:6px; background:white;
+              transform:translate(-50%,-50%); z-index:6; }
+</style>
+</head>
+<body>
+
+<div id="ui"></div>
+<div id="game"></div>
+<div id="blind"></div>
+<div id="weapon"></div>
+<div id="crosshair"></div>
+
+<script>
+const game = document.getElementById("game");
+const ui = document.getElementById("ui");
+const blind = document.getElementById("blind");
+
+let tier = "GOLD"; // 테스트용, 나중에 선택 가능
+let kills = 0;
+let dodged = 0;
+let goalKills = [25,50,100][Math.floor(Math.random()*3)];
+let goalDodges = [10,20,30][Math.floor(Math.random()*3)];
+let timeLimits = { "IRON":60, "BRONZE":50, "SILVER":45, "GOLD":40, "PLATINUM":35, "IMMORTAL":30, "RADIANT":25 };
+let timeLeft = timeLimits[tier];
+
+// 업데이트 UI
+function updateUI(){
+  ui.innerHTML = `🎯 Kills: ${kills}/${goalKills}<br>
+                  🟡 Dodges: ${dodged}/${goalDodges}<br>
+                  ⏳ Time Left: ${timeLeft}s<br>
+                  🏆 Tier: ${tier}`;
+}
+
+// 랜덤 위치
+function randomPos() {
+  return { x: Math.random() * (window.innerWidth - 40), y: Math.random() * (window.innerHeight - 40) };
+}
+
+// 적 생성 (헤드/바디)
+function spawnEnemy(count=1){
+  for(let i=0;i<count;i++){
+    const e = document.createElement("div");
+    e.className="enemy";
+    e.dataset.hp = 4;
+    const p=randomPos();
+    e.style.left=p.x+"px";
+    e.style.top=p.y+"px";
+
+    e.addEventListener("click", (event)=>{
+      const rect = e.getBoundingClientRect();
+      const clickY = event.clientY - rect.top;
+      const height = rect.height;
+      if(clickY < height*0.3){ // 헤드
+        kills++;
+        e.remove();
+        updateUI();
+        checkGoal();
+        return;
+      }
+      // 바디
+      e.dataset.hp--;
+      e.style.background="#aa0000";
+      if(e.dataset.hp <=0){
+        kills++;
+        e.remove();
+      }
+      updateUI();
+      checkGoal();
+    });
+
+    game.appendChild(e);
+    if(tier==="RADIANT") playFootstep(p.x);
+  }
+}
+
+// 삥 생성
+function spawnPing(){
+  const p = document.createElement("div");
+  p.className="ping";
+  const pos=randomPos();
+  p.style.left=pos.x+"px";
+  p.style.top=pos.y+"px";
+
+  let speed = 1 + Math.random()*4;
+  let dx = Math.random()>0.5 ? speed : -speed;
+  let dy = Math.random()>0.5 ? speed : -speed;
+
+  const move = setInterval(()=>{
+    p.style.left=(p.offsetLeft+dx)+"px";
+    p.style.top=(p.offsetTop+dy)+"px";
+
+    if(p.offsetLeft<0||p.offsetTop<0||p.offsetLeft>window.innerWidth||p.offsetTop>window.innerHeight){
+      dodged++;
+      p.remove();
+      clearInterval(move);
+      updateUI();
+      checkGoal();
+    }
+  },16);
+
+  p.onclick=()=>{
+    p.remove();
+    clearInterval(move);
+  };
+
+  game.appendChild(p);
+}
+
+// 발소리
+function playFootstep(x){
+  const audio=new Audio("https://actions.google.com/sounds/v1/foley/footsteps_on_wood.ogg");
+  audio.volume=0.5;
+  audio.pan = x < window.innerWidth/2 ? -1:1;
+  audio.play();
+}
+
+// 목표 체크
+function checkGoal(){
+  if(kills>=goalKills && dodged>=goalDodges){
+    clearInterval(timerInterval);
+    gameOver(true);
+  }
+}
+
+// 게임 종료
+function gameOver(success){
+  if(success){ alert("🎉 성공! 단계 클리어!"); }
+  else { alert("💀 시간 초과! 실패!"); }
+  location.reload();
+}
+
+// 밴달 단발 발사
+document.addEventListener("click", ()=>{
+  shootVandal();
+});
+function shootVandal(){
+  const gun = new Audio("https://actions.google.com/sounds/v1/impacts/metal_thud_and_rattle.ogg");
+  gun.volume=0.3;
+  gun.play();
+}
+
+// 게임 시작
+function start(){
+  updateUI();
+  // 레디언트 블라인드
+  if(tier==="RADIANT"){ blind.style.display="block"; }
+  setInterval(()=>spawnEnemy(Math.random()>0.7?2:1),1000);
+  setInterval(()=>spawnPing(),800);
+}
+
+start();
+
+// 시간 제한
+const timerInterval = setInterval(()=>{
+  timeLeft--;
+  updateUI();
+  if(timeLeft<=0){ clearInterval(timerInterval); gameOver(false); }
+},1000);
+
+</script>
+</body>
+</html>
